@@ -1,0 +1,31 @@
+{
+	"name": "zerodi-lib",
+	"version": "0.1.0",
+	"private": true,
+	"description": "ZeroDI - Lightweight, fast, fully typed dependency injector with compile-time generated code",
+	"workspaces": ["packages/*", "examples/*"],
+	"scripts": {
+		"build": "pnpm -r build",
+		"dev": "pnpm -r dev",
+		"test": "pnpm -r test",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"clean": "pnpm -r clean && rm -rf node_modules",
+		"changeset": "changeset",
+		"version-packages": "changeset version",
+		"release": "pnpm build && changeset publish"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@changesets/cli": "^2.27.1",
+		"@types/node": "^20.11.0",
+		"tsx": "^4.7.0",
+		"typescript": "^5.3.3"
+	},
+	"engines": {
+		"node": ">=18.0.0",
+		"pnpm": ">=8.0.0"
+	},
+	"packageManager": "pnpm@8.15.0"
+}
