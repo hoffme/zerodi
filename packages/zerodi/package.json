@@ -1,34 +1,36 @@
 {
 	"name": "zerodi",
-	"version": "0.1.1",
-	"description": "Lightweight, fast, fully typed dependency injector with compile-time generated code",
+	"version": "0.1.0",
 	"type": "module",
-	"main": "./dist/index.js",
-	"module": "./dist/index.js",
-	"types": "./dist/index.d.ts",
 	"bin": {
 		"zerodi": "./dist/cli.js"
 	},
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"exports": {
 		".": {
-			"types": "./dist/index.d.ts",
 			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
+			"require": "./dist/index.cjs",
+			"types": "./dist/index.d.ts"
 		}
 	},
-	"files": ["dist"],
 	"scripts": {
 		"build": "tsup",
-		"clean": "rm -rf dist"
+		"dev": "tsup --watch",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:coverage": "vitest --coverage"
 	},
-	"keywords": ["zerodi", "dependency injector", "code-gen"],
-	"author": "hoffme",
-	"license": "MIT",
 	"devDependencies": {
+		"@types/node": "^20.11.0",
 		"tsup": "^8.0.1",
-		"typescript": "^5.3.3"
+		"typescript": "^5.3.3",
+		"vitest": "^2.1.0",
+		"@vitest/ui": "^2.1.0",
+		"@vitest/coverage-v8": "^2.1.0"
 	},
-	"peerDependencies": {
-		"typescript": "^5.0.0"
+	"dependencies": {
+		"typescript": "^5.3.3"
 	}
 }
