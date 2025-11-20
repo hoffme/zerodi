@@ -73,16 +73,12 @@ export class Provider<
 		const bId = this.parseBuildId(buildId);
 
 		const count = this.counts.get(bId);
-		if (!count) return;
 
-		if (count && count > 1) {
-			this.counts.set(bId, count - 1);
-			return;
-		}
+		const nextCount = Math.max((count || 0) - 1, 0);
 
-		if (this.config.disableDisposeDestroy) {
-			return;
-		}
+		this.counts.set(bId, nextCount);
+
+		if (nextCount > 0 || this.config.disableDisposeDestroy) return;
 
 		await this.destroy(bId);
 	};
@@ -163,8 +159,16 @@ export class Provider<
 	};
 }
 
-export const getProviders = <P extends Record<string, ProviderKey>>(keys: P) => {
-	return Provider.get(keys);
+export const createProvider = <
+	K extends string,
+	V,
+	D extends Record<string, ProviderKey> = Record<string, ProviderKey>,
+>(
+	config: ProviderConfig<K, D, V>
+) => new Provider(config);
+
+export const getProviders = async <P extends Record<string, ProviderKey>>(keys: P) => {
+	return await Provider.get(keys);
 };
 
 export const getProvider = async <K extends ProviderKey>(key: K) => {

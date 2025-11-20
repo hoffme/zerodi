@@ -82,13 +82,16 @@ const generate = async () => {
 
 	const checker = program.getTypeChecker();
 
-	const contents: {
+	interface Content {
 		import_path: string;
 		property: string;
 		key: string;
 		eager: boolean;
 		hidden: boolean;
-	}[] = [];
+		deps: Record<string, string>;
+	}
+
+	const contents: Content[] = [];
 
 	for (const sourceFile of program.getSourceFiles()) {
 		if (sourceFile.fileName.includes('node_modules') || !sourceFile.fileName.endsWith('.ts')) {
@@ -109,39 +112,104 @@ const generate = async () => {
 				const property = decl.name.text;
 
 				const init = decl.initializer;
-				if (!init || !ts.isNewExpression(init)) continue;
+				if (!init) continue;
 
-				const typeName = checker.getSymbolAtLocation(init.expression)?.getName();
-				if (typeName !== 'Provider') continue;
+				let configArg = undefined;
+				if (ts.isNewExpression(init)) {
+					const typeName = checker.getSymbolAtLocation(init.expression)?.getName();
+					if (typeName !== 'Provider') continue;
+
+					configArg = init.arguments?.[0];
+				} else if (ts.isCallExpression(init)) {
+					const isCreateProvider =
+						ts.isIdentifier(init.expression) &&
+						init.expression.text === 'createProvider';
+					if (!isCreateProvider) continue;
+
+					configArg = init.arguments?.[0];
+				} else {
+					continue;
+				}
 
 				let key = property;
 				let eager = false;
 				let hidden = false;
+				const deps: Record<string, string> = {};
 
-				if (init.arguments?.[0] && ts.isObjectLiteralExpression(init.arguments[0])) {
-					for (const prop of init.arguments[0].properties) {
+				if (configArg && ts.isObjectLiteralExpression(configArg)) {
+					for (const prop of configArg.properties) {
 						if (!ts.isPropertyAssignment(prop)) continue;
 
 						const name = prop.name.getText();
 						const value = prop.initializer;
 
-						if (name === 'key' && ts.isStringLiteral(value)) key = value.text;
-						if (name === 'eager' && value.kind === ts.SyntaxKind.TrueKeyword)
+						if (name === 'key' && ts.isStringLiteral(value)) {
+							key = value.text;
+						}
+						if (name === 'eager' && value.kind === ts.SyntaxKind.TrueKeyword) {
 							eager = true;
-						if (name === 'hidden' && value.kind === ts.SyntaxKind.TrueKeyword)
+						}
+						if (name === 'hidden' && value.kind === ts.SyntaxKind.TrueKeyword) {
 							hidden = true;
+						}
+						if (name === 'deps' && ts.isObjectLiteralExpression(prop.initializer)) {
+							for (const depProp of prop.initializer.properties) {
+								if (!ts.isPropertyAssignment(depProp)) continue;
+
+								const depKey = depProp.name.getText().replace(/['"]/g, '');
+
+								if (ts.isStringLiteral(depProp.initializer)) {
+									deps[depKey] = depProp.initializer.text;
+								}
+							}
+						}
 					}
 				}
 
-				contents.push({
-					import_path,
-					property,
-					key,
-					eager,
-					hidden,
-				});
+				contents.push({ import_path, property, key, eager, hidden, deps });
 			}
 		});
+	}
+
+	const graph = contents.reduce((result, content) => {
+		result.set(content.key, Array.from(Object.values(content.deps)));
+		return result;
+	}, new Map<string, string[]>());
+
+	const cycles: string[][] = [];
+	const visited = new Set<string>();
+	const recursionStack = new Set<string>();
+	const path: string[] = [];
+
+	const dfs = (key: string): void => {
+		if (!graph.has(key)) return;
+
+		if (recursionStack.has(key)) {
+			const cycleStart = path.indexOf(key);
+			cycles.push([...path.slice(cycleStart), key]);
+			return;
+		}
+
+		if (visited.has(key)) return;
+
+		visited.add(key);
+		recursionStack.add(key);
+		path.push(key);
+
+		const deps = graph.get(key) || [];
+		for (const dep of deps) dfs(dep);
+
+		recursionStack.delete(key);
+		path.pop();
+	};
+
+	for (const content of contents) {
+		if (visited.has(content.key)) continue;
+		dfs(content.key);
+	}
+
+	if (cycles.length > 0) {
+		throw new Error(`Cicle depenendecy: ${cycles.map((key) => `'${key}'`).join(' -> ')}`);
 	}
 
 	const code = generateOutput({
